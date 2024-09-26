@@ -1,0 +1,14 @@
+# tasks/main.yml
+- name: Query AD for computers with old password set dates
+  ansible.windows.win_shell:
+    script: |
+      $thresholdDate = (Get-Date).AddDays(-{{ password_age }}).ToString("yyyy-MM-dd")
+      $computers = Get-ADComputer -Filter "PasswordLastSet -lt '$thresholdDate'" -Property PasswordLastSet | Select-Object Name, PasswordLastSet
+      $computers | ForEach-Object { Write-Host "$($_.Name): $($_.PasswordLastSet)" }
+  args:
+    executable: PowerShell
+  register: ad_query_result
+
+- name: Display AD query results
+  debug:
+    msg: "{{ ad_query_result.stdout_lines }}"
