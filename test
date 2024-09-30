@@ -1,35 +1,14 @@
----
-- name: Verify Connection to Windows Host
-  win_ping:
+from jinja2 import Environment
 
-- name: Calculate Date Threshold for Password Age Query
-  win_shell: |
-    $thresholdDate = (Get-Date).AddDays(-30).ToString("yyyy-MM-dd")
-    Write-Output $thresholdDate
-  register: threshold_date
+def ad_to_dict(array, key_field, value_field):
+    """
+    Custom Jinja2 filter to convert array output into a dictionary.
+    array: List of dictionaries to convert.
+    key_field: Field to use as the key in the dictionary.
+    value_field: Field to use as the value in the dictionary.
+    """
+    return {item[key_field]: item[value_field] for item in array}
 
-- name: Display calculated date threshold
-  ansible.builtin.debug:
-    msg: "Threshold Date for Password Query: {{ threshold_date.stdout }}"
-
-- name: Query AD for Computers with Password Last Set Older than 30 Days
-  win_shell: |
-    $thresholdDate = "{{ threshold_date.stdout }}"
-    $query = "PasswordLastSet -lt '$thresholdDate'"
-    $securePassword = ConvertTo-SecureString '{{ hub_sa_password }}' -AsPlainText -Force
-    $credential = New-Object System.Management.Automation.PSCredential('{{ hub_sa_user }}', $securePassword)
-    $computers = Get-ADComputer -Filter $query -Credential $credential -Properties PasswordLastSet
-    $computers | ForEach-Object { Write-Host "$($_.Name): $($_.PasswordLastSet)" }
-  register: ad_computer_query
-
-- name: Display raw output from AD computer query
-  ansible.builtin.debug:
-    msg: "{{ ad_computer_query.stdout_lines[:10] }}"
-
-- name: Convert AD query output to a dictionary using custom filter
-  set_fact:
-    devices: "{{ ad_computer_query.stdout_lines | map('regex_replace', '(.*): (.*)', '{\"deviceName\": \"\\1\", \"lastPasswordSet\": \"\\2\"}') | map('from_json') | ad_to_dict('deviceName', 'lastPasswordSet') }}"
-
-- name: Display devices in dictionary format
-  ansible.builtin.debug:
-    msg: "{{ devices }}"
+# Register the custom filter
+env = Environment()
+env.filters['ad_to_dict'] = ad_to_dict
