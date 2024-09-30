@@ -23,10 +23,12 @@ class FilterModule(object):
             # Get the value for last password set
             last_password_set = item.get(value_field, None)
             
-            if last_password_set and last_password_set != "0001-01-01T00:00:00Z":
+            if last_password_set:
                 try:
-                    # Format the time if it's valid
-                    formatted_time = datetime.strptime(last_password_set, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%dT%H:%M:%SZ")
+                    # Parse the input format (assuming it's like MM/DD/YYYY hh:mm:ss AM/PM)
+                    parsed_time = datetime.strptime(last_password_set, "%m/%d/%Y %I:%M:%S %p")
+                    # Convert to ISO format
+                    formatted_time = parsed_time.strftime("%Y-%m-%dT%H:%M:%SZ")
                 except ValueError:
                     # If invalid, fallback to 'Not Available'
                     formatted_time = "Not Available"
