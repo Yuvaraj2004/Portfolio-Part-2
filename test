@@ -28,7 +28,7 @@
 
 - name: Convert AD query output to a dictionary using custom filter
   set_fact:
-    devices: "{{ ad_computer_query.stdout_lines | map('regex_replace', '(.*): (.*)', '{\"deviceName\": \"\\1\", \"lastPasswordChange\": \"\\2\"}') | map('from_json') | ad_to_dict('deviceName', 'lastPasswordChange') }}"
+    devices: "{{ ad_computer_query.stdout_lines | map('regex_replace', '(.*): (.*)', '{\"deviceName\": \"\\1\", \"lastPasswordSet\": \"\\2\"}') | map('from_json') | ad_to_dict('deviceName', 'lastPasswordSet') }}"
 
 - name: Display devices in dictionary format
   ansible.builtin.debug:
