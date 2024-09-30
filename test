@@ -1,35 +1,39 @@
-from datetime import datetime
+---
+- name: Verify Connection to Windows Host
+  win_ping:
 
-class FilterModule(object):
-    def filters(self):
-        """
-        Custom Jinja2 filter to convert an array into a list of dictionaries
-        with a formatted timestamp.
-        """
-        return {
-            'ad_to_list_with_time': self.ad_to_list_with_time,
-        }
+- name: Calculate Date Threshold for Password Age Query
+  win_shell: |
+    $thresholdDate = (Get-Date).AddDays(-30).ToString("yyyy-MM-dd")
+    Write-Output $thresholdDate
+  register: threshold_date
 
-    def ad_to_list_with_time(self, array, key_field, value_field):
-        """
-        Convert array output into a list of dictionaries with formatted time.
-        array: List of dictionaries to convert.
-        key_field: Field to use as the key for each dictionary's key.
-        value_field: Field to use as the key for each dictionary's value.
-        """
-        formatted_list = []
-        for item in array:
-            # Assuming the value is in a format compatible with Python's datetime
-            last_password_set = item[value_field]
-            try:
-                # Format time if it's valid
-                formatted_time = datetime.strptime(last_password_set, "%Y-%m-%dT%H:%M:%SZ").strftime("%Y-%m-%dT%H:%M:%SZ")
-            except ValueError:
-                # If time is not valid, fallback to default value or leave as-is
-                formatted_time = "0001-01-01T00:00:00Z"
-            
-            formatted_list.append({
-                "deviceName": item[key_field],
-                "lastPasswordSet": formatted_time
-            })
-        return formatted_list
+- name: Display calculated date threshold
+  ansible.builtin.debug:
+    msg: "Threshold Date for Password Query: {{ threshold_date.stdout }}"
+
+- name: Query AD for Computers with Password Last Set Older than 30 Days
+  win_shell: |
+    $thresholdDate = "{{ threshold_date.stdout }}"
+    $query = "PasswordLastSet -lt '$thresholdDate'"
+    $securePassword = ConvertTo-SecureString '{{ hub_sa_password }}' -AsPlainText -Force
+    $credential = New-Object System.Management.Automation.PSCredential('{{ hub_sa_user }}', $securePassword)
+    $computers = Get-ADComputer -Filter $query -Credential $credential -Properties PasswordLastSet
+    $computers | ForEach-Object { Write-Host "$($_.Name): $($_.PasswordLastSet)" }
+  register: ad_computer_query
+
+- name: Display raw output from AD computer query
+  ansible.builtin.debug:
+    msg: "{{ ad_computer_query.stdout_lines[:10] }}"
+
+- name: Convert AD query output to a list of dictionaries with formatted time
+  set_fact:
+    devices: "{{ ad_computer_query.stdout_lines | map('regex_replace', '(.*): (.*)', '{\"deviceName\": \"\\1\", \"lastPasswordSet\": \"\\2\"}') | map('from_json') | ad_to_list_with_time('deviceName', 'lastPasswordSet') }}"
+
+- name: Set ansible_facts for formatted devices
+  set_fact:
+    last_sync_time: "{{ devices }}"
+
+- name: Display the final output
+  ansible.builtin.debug:
+    var: last_sync_time
