@@ -26,10 +26,14 @@
   ansible.builtin.debug:
     msg: "{{ ad_computer_query.stdout_lines[:10] }}"
 
-- name: Convert AD query output to a list of dictionaries using custom filter
+- name: Convert AD query output to a list of dictionaries with formatted time
   set_fact:
-    devices: "{{ ad_computer_query.stdout_lines | map('regex_replace', '(.*): (.*)', '{\"deviceName\": \"\\1\", \"lastPasswordSet\": \"\\2\"}') | map('from_json') | ad_to_list_of_dict('deviceName', 'lastPasswordSet') }}"
+    devices: "{{ ad_computer_query.stdout_lines | map('regex_replace', '(.*): (.*)', '{\"deviceName\": \"\\1\", \"lastPasswordSet\": \"\\2\"}') | map('from_json') | ad_to_list_with_time('deviceName', 'lastPasswordSet') }}"
 
-- name: Display devices as list of dictionaries
+- name: Set ansible_facts for formatted devices
+  set_fact:
+    last_sync_time: "{{ devices }}"
+
+- name: Display the final output
   ansible.builtin.debug:
-    msg: "{{ devices }}"
+    var: last_sync_time
