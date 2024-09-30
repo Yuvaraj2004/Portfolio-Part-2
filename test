@@ -1,51 +1,35 @@
 ---
-# This is your role's main.yml file under roles/active_directory/tasks/main.yml
+- name: Verify Connection to Windows Host
+  win_ping:
 
-# Step 1: Verify Connection to Windows Host
-- name: Ping the Windows host to verify connection
-  ansible.windows.win_ping:
-
-# Step 2: Check if AD PowerShell Module is available
-- name: Check if AD PowerShell Module is installed
-  ansible.windows.win_shell: |
-    Get-Module -ListAvailable -Name ActiveDirectory
-  register: ad_module_check
-
-- name: Display result of AD Module Check
-  debug:
-    msg: "AD Module Check Output: {{ ad_module_check.stdout }}"
-
-# Step 3: Simple AD Query to Check Communication
-- name: Run a simple AD query to get the first 5 users
-  ansible.windows.win_shell: |
-    Get-ADUser -Filter * -Property DisplayName | Select-Object -First 5 -Property DisplayName
-  register: ad_simple_query
-
-- name: Display simple AD query results
-  debug:
-    msg: "AD Users: {{ ad_simple_query.stdout }}"
-
-# Step 4: Calculate Date Threshold for Password Age Query
-- name: Calculate date threshold for password age
-  ansible.windows.win_shell: |
+- name: Calculate Date Threshold for Password Age Query
+  win_shell: |
     $thresholdDate = (Get-Date).AddDays(-30).ToString("yyyy-MM-dd")
     Write-Output $thresholdDate
   register: threshold_date
 
 - name: Display calculated date threshold
-  debug:
+  ansible.builtin.debug:
     msg: "Threshold Date for Password Query: {{ threshold_date.stdout }}"
 
-# Step 5: Query AD for Computers with Password Last Set Older than 30 Days
-- name: Query AD for computers with old password set dates
-  ansible.windows.win_shell: |
+- name: Query AD for Computers with Password Last Set Older than 30 Days
+  win_shell: |
     $thresholdDate = "{{ threshold_date.stdout }}"
-    $computers = Get-ADComputer -Filter "PasswordLastSet -lt '$thresholdDate'" -Property PasswordLastSet
+    $query = "PasswordLastSet -lt '$thresholdDate'"
+    $securePassword = ConvertTo-SecureString '{{ hub_sa_password }}' -AsPlainText -Force
+    $credential = New-Object System.Management.Automation.PSCredential('{{ hub_sa_user }}', $securePassword)
+    $computers = Get-ADComputer -Filter $query -Credential $credential -Properties PasswordLastSet
     $computers | ForEach-Object { Write-Host "$($_.Name): $($_.PasswordLastSet)" }
-  args:
-    executable: PowerShell
   register: ad_computer_query
 
-- name: Display AD computers with old password set dates
-  debug:
-    msg: "AD Computers: {{ ad_computer_query.stdout_lines }}"
+- name: Filter AD computers based on password set date
+  set_fact:
+    filtered_computers: "{{ ad_computer_query.stdout_lines | selectattr('search', 'search', threshold_date.stdout) | list }}"
+
+- name: Initialize dictionary for old password computers
+  set_fact:
+    computers_dict: "{{ filtered_computers | map('regex_replace', '(.*): (.*)', '{\"computerName\": \"\\1\", \"passwordLastSet\": \"\\2\"}') | list }}"
+
+- name: Display dictionary of filtered computers
+  ansible.builtin.debug:
+    msg: "{{ computers_dict }}"
