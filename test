@@ -4,7 +4,7 @@ class FilterModule(object):
     def filters(self):
         """
         Custom Jinja2 filter to convert an array into a dictionary
-        with the device name as the key and formatted time as the value.
+        with the device name as the key and formatted lastPasswordSet as the value.
         """
         return {
             'ad_to_fact_dict': self.ad_to_fact_dict,
@@ -12,7 +12,7 @@ class FilterModule(object):
 
     def ad_to_fact_dict(self, array, key_field, value_field):
         """
-        Convert array output into a dictionary with formatted time.
+        Convert array output into a dictionary with formatted lastPasswordSet.
         array: List of dictionaries to convert.
         key_field: Field to use as the key in the dictionary.
         value_field: Field to use as the value in the dictionary.
