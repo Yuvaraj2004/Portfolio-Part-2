@@ -1,17 +1,35 @@
-class FilterModule(object):
-    def filters(self):
-        """
-        Custom Jinja2 filter to convert an array into a list of dictionaries.
-        """
-        return {
-            'ad_to_list_of_dict': self.ad_to_list_of_dict,
-        }
+---
+- name: Verify Connection to Windows Host
+  win_ping:
 
-    def ad_to_list_of_dict(self, array, key_field, value_field):
-        """
-        Convert array output into a list of dictionaries.
-        array: List of arrays to convert.
-        key_field: Field to use as the key for each dictionary's key.
-        value_field: Field to use as the key for each dictionary's value.
-        """
-        return [{"deviceName": item[key_field], "lastPasswordSet": item[value_field]} for item in array]
+- name: Calculate Date Threshold for Password Age Query
+  win_shell: |
+    $thresholdDate = (Get-Date).AddDays(-30).ToString("yyyy-MM-dd")
+    Write-Output $thresholdDate
+  register: threshold_date
+
+- name: Display calculated date threshold
+  ansible.builtin.debug:
+    msg: "Threshold Date for Password Query: {{ threshold_date.stdout }}"
+
+- name: Query AD for Computers with Password Last Set Older than 30 Days
+  win_shell: |
+    $thresholdDate = "{{ threshold_date.stdout }}"
+    $query = "PasswordLastSet -lt '$thresholdDate'"
+    $securePassword = ConvertTo-SecureString '{{ hub_sa_password }}' -AsPlainText -Force
+    $credential = New-Object System.Management.Automation.PSCredential('{{ hub_sa_user }}', $securePassword)
+    $computers = Get-ADComputer -Filter $query -Credential $credential -Properties PasswordLastSet
+    $computers | ForEach-Object { Write-Host "$($_.Name): $($_.PasswordLastSet)" }
+  register: ad_computer_query
+
+- name: Display raw output from AD computer query
+  ansible.builtin.debug:
+    msg: "{{ ad_computer_query.stdout_lines[:10] }}"
+
+- name: Convert AD query output to a list of dictionaries using custom filter
+  set_fact:
+    devices: "{{ ad_computer_query.stdout_lines | map('regex_replace', '(.*): (.*)', '{\"deviceName\": \"\\1\", \"lastPasswordSet\": \"\\2\"}') | map('from_json') | ad_to_list_of_dict('deviceName', 'lastPasswordSet') }}"
+
+- name: Display devices as list of dictionaries
+  ansible.builtin.debug:
+    msg: "{{ devices }}"
