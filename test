@@ -1,17 +1,17 @@
 class FilterModule(object):
     def filters(self):
         """
-        Custom Jinja2 filter to convert an array into a dictionary.
+        Custom Jinja2 filter to convert an array into a list of dictionaries.
         """
         return {
-            'ad_to_dict': self.ad_to_dict,
+            'ad_to_list_of_dict': self.ad_to_list_of_dict,
         }
 
-    def ad_to_dict(self, array, key_field, value_field):
+    def ad_to_list_of_dict(self, array, key_field, value_field):
         """
-        Convert array output into a dictionary.
-        array: List of dictionaries to convert.
-        key_field: Field to use as the key in the dictionary.
-        value_field: Field to use as the value in the dictionary.
+        Convert array output into a list of dictionaries.
+        array: List of arrays to convert.
+        key_field: Field to use as the key for each dictionary's key.
+        value_field: Field to use as the key for each dictionary's value.
         """
-        return {item[key_field]: item[value_field] for item in array}
+        return [{"deviceName": item[key_field], "lastPasswordSet": item[value_field]} for item in array]
