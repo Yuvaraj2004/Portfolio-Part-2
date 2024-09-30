@@ -22,14 +22,18 @@
     $computers | ForEach-Object { Write-Host "$($_.Name): $($_.PasswordLastSet)" }
   register: ad_computer_query
 
-- name: Filter AD computers based on password set date
-  set_fact:
-    filtered_computers: "{{ ad_computer_query.stdout_lines | selectattr('search', 'search', threshold_date.stdout) | list }}"
-
-- name: Initialize dictionary for old password computers
-  set_fact:
-    computers_dict: "{{ filtered_computers | map('regex_replace', '(.*): (.*)', '{\"computerName\": \"\\1\", \"passwordLastSet\": \"\\2\"}') | list }}"
-
-- name: Display dictionary of filtered computers
+- name: Display first 10 lines of AD computer query output
   ansible.builtin.debug:
-    msg: "{{ computers_dict }}"
+    msg: "{{ ad_computer_query.stdout_lines[:10] }}"
+
+- name: Convert AD output to a list of dictionaries with computer name and last password change date
+  set_fact:
+    devices: "{{ ad_computer_query.stdout_lines | map('split', ': ') | map('dict', ['deviceName', 'lastPasswordChange']) | list }}"
+
+- name: Format lastPasswordChange to ISO format
+  set_fact:
+    formatted_devices: "{{ devices | map(attribute='lastPasswordChange', format_timestamp('%Y-%m-%dT%H:%M:%SZ')) | list }}"
+
+- name: Display formatted devices with last password change
+  ansible.builtin.debug:
+    msg: "{{ formatted_devices }}"
