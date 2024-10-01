@@ -1,16 +1,10 @@
-- name: Run Python script as domain user on remote Windows PC
-  hosts: windows
-  tasks:
-    - name: Run Python script on the target PC
+    - name: Execute script as different domain user using runas
       ansible.windows.win_shell: |
-        python C:\path\to\your_script.py
-      become: yes
-      become_user: "DOMAIN\\username"
-      become_method: runas
+        runas /user:DOMAIN\username "python C:\path\to\your_script.py"
+      register: script_output
       vars:
-        ansible_become_password: "your_password"
-      register: output
+        ansible_password: "your_password"
 
     - name: Output the results
       debug:
-        var: output.stdout
+        var: script_output.stdout
