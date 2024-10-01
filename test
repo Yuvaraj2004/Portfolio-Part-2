@@ -1,11 +1,15 @@
-- name: Run Python script via PowerShell as a specific domain user
-  win_psexec:
-    command: |
-      powershell.exe -executionpolicy bypass -noninteractive -nologo -command "python C:\path\to\your_script.py"
-    executable: C:\temp\psexec.exe
-    elevated: yes
-    nobanner: yes
-    username: "{{ dom_username }}"
-    password: "{{ dev_password }}"
-    interactive: yes
-    chdir: C:\path\to\your_script_directory
+---
+- name: Run Python script as a different domain user on remote Windows host
+  hosts: windows
+  vars_files:
+    - secrets.yml  # This file contains the encrypted password
+
+  tasks:
+    - name: Execute Python script as a different domain user using PowerShell
+      win_shell: |
+        $username = "qa-ent\K032086"
+        $password = "{{ ansible_user_password }}" | ConvertTo-SecureString -AsPlainText -Force
+        $credential = New-Object System.Management.Automation.PSCredential($username, $password)
+        Start-Process -Credential $credential -FilePath "python" -ArgumentList "C:\\path\\to\\script.py"
+      args:
+        executable: powershell.exe
