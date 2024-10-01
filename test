@@ -1,32 +1,32 @@
 import pyodbc
-import win32security
-import win32api
-import win32con
 
-# Log in as another user
-username = 'DOMAIN\\user'
-password = 'password'
-domain = 'DOMAIN'
+# Replace the following placeholders with your actual credentials
+server_name = "your_server_name"
+database_name = "your_database_name"
+domain_name = "your_domain_name"
+username = "your_username"
+password = "your_password"
 
-handle = win32security.LogonUser(
-    username,
-    domain,
-    password,
-    win32con.LOGON32_LOGON_INTERACTIVE,
-    win32con.LOGON32_PROVIDER_DEFAULT
-)
+# Construct the connection string using trusted authentication
+connection_string = f"DRIVER={{SQL Server Native Client 11.0}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;UID={username};PWD={password}"
 
-# Impersonate the user
-win32security.ImpersonateLoggedOnUser(handle)
+try:
+    # Connect to the SQL Server using the connection string
+    conn = pyodbc.connect(connection_string)
 
-# Connect to the database using pyodbc
-conn = pyodbc.connect(
-    'DRIVER={SQL Server};SERVER=server_name;DATABASE=database_name;Trusted_Connection=yes;'
-)
+    # Execute a query
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM your_table")
 
-# Perform database operations
-cursor = conn.cursor()
-cursor.execute('SELECT * FROM my_table')
+    # Fetch and print the results
+    rows = cursor.fetchall()
+    for row in rows:
+        print(row)
 
-# Revert to the original user
-win32security.RevertToSelf()
+except pyodbc.Error as e:
+    print("Error connecting to SQL Server:", e)
+
+finally:
+    # Close the connection
+    if conn:
+        conn.close()
