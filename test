@@ -1,11 +1,16 @@
 ---
-- name: Execute Python script on Windows host as another user
+- name: Run Python Script on Windows with Another User's Credentials
   hosts: windows
   vars_files:
     - vault.yml
   tasks:
-    - name: Run Python script as a different Windows user
+    - name: Copy Python script to the Windows host
+      ansible.windows.win_copy:
+        src: /path/to/your/script.py
+        dest: :\path\on\windows\script.py
+    
+    - name: Run the Python script as a different Windows user
       ansible.windows.win_shell: |
-        runas /user:{{ vault_windows_username }} /savecred "python C:\\path\\to\\your\\script.py"
+        runas /user:{{ vault_windows_username }} /savecred "python C:\\path\\on\\windows\\script.py"
       args:
         stdin: "{{ vault_windows_password }}"
