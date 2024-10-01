@@ -1,7 +1,11 @@
----
-- name: Run the Python script as a different Windows user
+- name: Run the Python script as a different Windows user and capture stdout
   ansible.windows.win_shell:
     _raw_params: |
       runas /user:{{ vault_windows_username }} /savecred \"python d:\\Random_Seed.py --target_server {{ target_dev_cm_server }} --target_database {{ target_dev_cm_database }} --target_table {{ target_dev_cm_table }}\"
   args:
     stdin: "{{ vault_windows_password }}"
+  register: script_output
+
+- name: Display the output of the Python script
+  debug:
+    var: script_output.stdout
