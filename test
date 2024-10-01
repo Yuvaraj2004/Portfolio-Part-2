@@ -1,10 +1,11 @@
-    - name: Execute script as different domain user using runas
-      ansible.windows.win_shell: |
-        runas /user:DOMAIN\username "python C:\path\to\your_script.py"
-      register: script_output
-      vars:
-        ansible_password: "your_password"
-
-    - name: Output the results
-      debug:
-        var: script_output.stdout
+- name: Run Python script via PowerShell as a specific domain user
+  win_psexec:
+    command: |
+      powershell.exe -executionpolicy bypass -noninteractive -nologo -command "python C:\path\to\your_script.py"
+    executable: C:\temp\psexec.exe
+    elevated: yes
+    nobanner: yes
+    username: "{{ dom_username }}"
+    password: "{{ dev_password }}"
+    interactive: yes
+    chdir: C:\path\to\your_script_directory
