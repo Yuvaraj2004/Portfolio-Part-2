@@ -1,32 +1,50 @@
 import pyodbc
+import win32security
+import win32con
 
-# Replace the following placeholders with your actual credentials
-server_name = "your_server_name"
-database_name = "your_database_name"
-domain_name = "your_domain_name"
-username = "your_username"
-password = "your_password"
+def run_query(domain, username, password, server, database, query):
+    try:
+        # Log on as the specified user
+        handle = win32security.LogonUser(
+            username,
+            domain,
+            password,
+            win32con.LOGON32_LOGON_NEW_CREDENTIALS,
+            win32con.LOGON32_PROVIDER_WINNT50
+        )
 
-# Construct the connection string using trusted authentication
-connection_string = f"DRIVER={{SQL Server Native Client 11.0}};SERVER={server_name};DATABASE={database_name};Trusted_Connection=yes;UID={username};PWD={password}"
+        # Impersonate the logged-on user
+        win32security.ImpersonateLoggedOnUser(handle)
 
-try:
-    # Connect to the SQL Server using the connection string
-    conn = pyodbc.connect(connection_string)
+        # Connection string using Windows Authentication
+        conn_str = (
+            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"SERVER={server};"
+            f"DATABASE={database};"
+            "Trusted_Connection=yes;"
+        )
 
-    # Execute a query
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM your_table")
+        # Connect to SQL Server
+        with pyodbc.connect(conn_str) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                for row in cursor.fetchall():
+                    print(row)
 
-    # Fetch and print the results
-    rows = cursor.fetchall()
-    for row in rows:
-        print(row)
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
-except pyodbc.Error as e:
-    print("Error connecting to SQL Server:", e)
+    finally:
+        # Revert to the original user
+        win32security.RevertToSelf()
+        handle.Close()
 
-finally:
-    # Close the connection
-    if conn:
-        conn.close()
+if __name__ == "__main__":
+    domain = 'YOUR_DOMAIN'        # e.g., 'MYCOMPANY'
+    username = 'YOUR_USERNAME'    # e.g., 'johndoe'
+    password = 'YOUR_PASSWORD'    # e.g., 'P@ssw0rd!'
+    server = 'YOUR_SERVER'        # e.g., 'sqlserver.example.com'
+    database = 'YOUR_DATABASE'    # e.g., 'SalesDB'
+    query = 'SELECT * FROM YourTable;'  # Your SQL query
+
+    run_query(domain, username, password, server, database, query)
