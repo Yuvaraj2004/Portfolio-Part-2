@@ -1,15 +1,32 @@
----
-- name: Run Python script as a different domain user on remote Windows host
-  hosts: windows
-  vars_files:
-    - secrets.yml  # This file contains the encrypted password
+import pyodbc
+import win32security
+import win32api
+import win32con
 
-  tasks:
-    - name: Execute Python script as a different domain user using PowerShell
-      win_shell: |
-        $username = "qa-ent\K032086"
-        $password = "{{ ansible_user_password }}" | ConvertTo-SecureString -AsPlainText -Force
-        $credential = New-Object System.Management.Automation.PSCredential($username, $password)
-        Start-Process -Credential $credential -FilePath "python" -ArgumentList "C:\\path\\to\\script.py"
-      args:
-        executable: powershell.exe
+# Log in as another user
+username = 'DOMAIN\\user'
+password = 'password'
+domain = 'DOMAIN'
+
+handle = win32security.LogonUser(
+    username,
+    domain,
+    password,
+    win32con.LOGON32_LOGON_INTERACTIVE,
+    win32con.LOGON32_PROVIDER_DEFAULT
+)
+
+# Impersonate the user
+win32security.ImpersonateLoggedOnUser(handle)
+
+# Connect to the database using pyodbc
+conn = pyodbc.connect(
+    'DRIVER={SQL Server};SERVER=server_name;DATABASE=database_name;Trusted_Connection=yes;'
+)
+
+# Perform database operations
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM my_table')
+
+# Revert to the original user
+win32security.RevertToSelf()
